@@ -2,7 +2,7 @@
 // This module is client-only. Import it only in 'use client' components.
 import { PDFJS_WORKER_URL } from './constants';
 
-// We lazy-load pdfjs-dist to avoid SSR issues (DOMMatrix not being available in Node.js)
+// We lazy-load pdfjs-dist to avoid SSR issues (DOMMatrix not available in Node.js)
 let pdfjsModule: typeof import('pdfjs-dist') | null = null;
 
 async function getPdfjs() {
@@ -18,7 +18,12 @@ export type { PDFDocumentProxy } from 'pdfjs-dist';
 
 export async function loadPdfDocument(data: ArrayBuffer) {
     const pdfjs = await getPdfjs();
-    const loadingTask = pdfjs.getDocument({ data });
+    // IMPORTANT: Copy the ArrayBuffer before passing to PDF.js.
+    // PDF.js transfers the buffer to its Web Worker via postMessage,
+    // which detaches the original. If React strict mode re-runs the
+    // effect, the original ArrayBuffer would be unusable.
+    const copy = data.slice(0);
+    const loadingTask = pdfjs.getDocument({ data: copy });
     return loadingTask.promise;
 }
 
@@ -27,7 +32,7 @@ export async function renderPageToCanvas(
     pageNum: number,
     canvas: HTMLCanvasElement,
     scale: number,
-): Promise<{ width: number; height: number }> {
+) {
     const page = await pdfDoc.getPage(pageNum);
     const viewport = page.getViewport({ scale });
 
@@ -44,7 +49,13 @@ export async function renderPageToCanvas(
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await page.render(renderContext as any).promise;
+    const renderTask = page.render(renderContext as any);
 
-    return { width: viewport.width, height: viewport.height };
+    return {
+        promise: renderTask.promise.then(() => ({
+            width: viewport.width,
+            height: viewport.height,
+        })),
+        cancel: () => renderTask.cancel(),
+    };
 }
