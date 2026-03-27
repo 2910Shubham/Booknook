@@ -760,6 +760,7 @@ input {
   box-shadow: 0 2px 20px var(--shadow-color),
     0 0 0 1px var(--border-subtle);
   border-radius: 2px;
+  transition: filter var(--duration-normal) var(--ease-out);
 }
 
 .canvas-spinner-overlay {

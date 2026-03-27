@@ -58,11 +58,10 @@ export function usePDF(
                 }
             } catch (err) {
                 if (cancelled) return;
-                setError(
-                    err instanceof Error
-                        ? err.message
-                        : 'Failed to load PDF document',
-                );
+                const msg = err instanceof Error ? err.message : String(err);
+                // Ignore cancellation errors from PDF.js (strict mode / HMR)
+                if (msg.includes('cancelled') || msg.includes('Rendering cancelled')) return;
+                setError(msg || 'Failed to load PDF document');
             }
         };
 

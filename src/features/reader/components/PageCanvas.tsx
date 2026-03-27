@@ -1,8 +1,19 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React from 'react';
 import { usePdfStore } from '@/store/pdfStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import Spinner from '@/components/ui/Spinner';
+import type { ThemeMode } from '@/types';
+
+// CSS filter strings that transform the white-bg PDF for each theme.
+// Light: no change. Dark: invert colors. Sepia: warm tint. Night: inverted + dimmed red.
+const CANVAS_FILTERS: Record<ThemeMode, string> = {
+    light: 'none',
+    dark: 'invert(0.88) hue-rotate(180deg)',
+    sepia: 'sepia(0.35) brightness(0.95)',
+    night: 'invert(0.88) hue-rotate(180deg) brightness(0.5) sepia(0.5) saturate(2)',
+};
 
 interface PageCanvasProps {
     canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -13,6 +24,7 @@ export default function PageCanvas({ canvasRef }: PageCanvasProps) {
     const isLoading = usePdfStore((s) => s.isLoading);
     const error = usePdfStore((s) => s.error);
     const pdfDoc = usePdfStore((s) => s.pdfDoc);
+    const theme = useSettingsStore((s) => s.theme);
 
     if (error) {
         return (
@@ -46,7 +58,11 @@ export default function PageCanvas({ canvasRef }: PageCanvasProps) {
                     <Spinner size={28} />
                 </div>
             )}
-            <canvas ref={canvasRef} className="pdf-canvas" />
+            <canvas
+                ref={canvasRef}
+                className="pdf-canvas"
+                style={{ filter: CANVAS_FILTERS[theme] }}
+            />
         </div>
     );
 }
