@@ -13,6 +13,7 @@ import PageCanvas from './PageCanvas';
 import PageTransition from './PageTransition';
 import FocusModeOverlay from './FocusModeOverlay';
 import SettingsPanel from '@/features/settings/components/SettingsPanel';
+import AnnotationToolbar from '@/features/annotations/components/AnnotationToolbar';
 
 interface ReaderLayoutProps {
     onClose: () => void;
@@ -57,6 +58,8 @@ export default function ReaderLayout({ onClose }: ReaderLayoutProps) {
                     <PageCanvas canvasRef={canvasRef} />
                 </PageTransition>
             </div>
+
+            <AnnotationToolbar />
 
             {/* Focus mode exit button */}
             <FocusModeOverlay focusMode={focusMode} onExit={exitFocus} />

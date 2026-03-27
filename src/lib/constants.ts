@@ -14,7 +14,7 @@ export const ZOOM_MIN = 0.25;
 export const ZOOM_MAX = 3.0;
 export const ZOOM_STEP = 0.1;
 export const ZOOM_DEFAULT = 1.0;
-export const ZOOM_FIT_PADDING = 40; // px padding for fit-to-width
+export const ZOOM_FIT_PADDING = 16; // px padding for fit-to-width
 
 // Animation Constants
 export const PAGE_TRANSITION_DURATION = 200; // ms

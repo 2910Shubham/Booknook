@@ -53,7 +53,7 @@ export const usePdfStore = create<PdfState>((set, get) => ({
     error: null,
     isRendering: false,
     zoom: ZOOM_DEFAULT,
-    baseScale: 1,
+    baseScale: 0,
 
     setFile: (file, fileName, fileSize) =>
         set({ file, fileName, fileSize, error: null }),
@@ -70,7 +70,7 @@ export const usePdfStore = create<PdfState>((set, get) => ({
             error: null,
             isRendering: false,
             zoom: ZOOM_DEFAULT,
-            baseScale: 1,
+            baseScale: 0,
         }),
 
     setPdfDoc: (pdfDoc, totalPages) =>

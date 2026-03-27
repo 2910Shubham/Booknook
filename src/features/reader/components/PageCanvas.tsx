@@ -5,6 +5,7 @@ import { usePdfStore } from '@/store/pdfStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import Spinner from '@/components/ui/Spinner';
 import type { ThemeMode } from '@/types';
+import AnnotationCanvas from '@/features/annotations/components/AnnotationCanvas';
 
 // CSS filter strings that transform the white-bg PDF for each theme.
 // Light: no change. Dark: invert colors. Sepia: warm tint. Night: inverted + dimmed red.
@@ -63,6 +64,7 @@ export default function PageCanvas({ canvasRef }: PageCanvasProps) {
                 className="pdf-canvas"
                 style={{ filter: CANVAS_FILTERS[theme] }}
             />
+            <AnnotationCanvas pdfCanvasRef={canvasRef} />
         </div>
     );
 }
