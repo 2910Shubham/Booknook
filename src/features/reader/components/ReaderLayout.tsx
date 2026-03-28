@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { usePdfStore } from '@/store/pdfStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { usePDF } from '../hooks/usePDF';
@@ -35,10 +35,21 @@ export default function ReaderLayout({ onClose }: ReaderLayoutProps) {
     useKeyboardShortcuts();
     useTouchGestures(containerRef);
 
+    useEffect(() => {
+        const root = document.documentElement;
+        const body = document.body;
+        root.classList.add('reader-viewport');
+        body.classList.add('reader-viewport');
+        return () => {
+            root.classList.remove('reader-viewport');
+            body.classList.remove('reader-viewport');
+        };
+    }, []);
+
     return (
         <div
             ref={layoutRef}
-            className={`reader-layout ${focusMode ? 'reader-focus-mode' : ''}`}
+            className={`reader-layout reader-root ${focusMode ? 'reader-focus-mode' : ''}`}
             id="reader-layout"
         >
             {/* Toolbar */}

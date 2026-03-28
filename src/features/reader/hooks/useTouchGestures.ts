@@ -36,6 +36,14 @@ export function useTouchGestures(containerRef: React.RefObject<HTMLElement | nul
         if (!el) return;
 
         const handleTouchStart = (e: TouchEvent) => {
+            const target = e.target as HTMLElement;
+            if (
+                target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.isContentEditable
+            ) {
+                return;
+            }
             // Pinch-to-zoom (two fingers)
             if (e.touches.length === 2) {
                 e.preventDefault();
@@ -66,6 +74,14 @@ export function useTouchGestures(containerRef: React.RefObject<HTMLElement | nul
         };
 
         const handleTouchMove = (e: TouchEvent) => {
+            const target = e.target as HTMLElement;
+            if (
+                target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.isContentEditable
+            ) {
+                return;
+            }
             // Pinch-to-zoom
             if (e.touches.length === 2 && initialDistance.current !== null) {
                 e.preventDefault();
@@ -92,6 +108,16 @@ export function useTouchGestures(containerRef: React.RefObject<HTMLElement | nul
         };
 
         const handleTouchEnd = (e: TouchEvent) => {
+            const target = e.target as HTMLElement;
+            if (
+                target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.isContentEditable
+            ) {
+                isSwiping.current = false;
+                isPinching.current = false;
+                return;
+            }
             // Reset pinch state
             if (isPinching.current) {
                 initialDistance.current = null;

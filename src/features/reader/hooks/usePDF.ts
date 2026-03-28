@@ -4,7 +4,6 @@ import { useEffect, useCallback, useRef } from 'react';
 import { usePdfStore } from '@/store/pdfStore';
 import { useProgressStore } from '@/store/progressStore';
 import { loadPdfDocument, renderPageToCanvas } from '@/lib/pdf';
-import { ZOOM_FIT_PADDING } from '@/lib/constants';
 
 export function usePDF(
     canvasRef: React.RefObject<HTMLCanvasElement | null>,
@@ -33,6 +32,44 @@ export function usePDF(
     const pendingRenderRef = useRef<{ page: number; scale: number } | null>(null);
     const cancelRef = useRef<(() => void) | null>(null);
     const resizeTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    const getContainerBox = useCallback(() => {
+        const container = containerRef.current;
+        if (!container) return null;
+        const rect = container.getBoundingClientRect();
+        const styles = window.getComputedStyle(container);
+        const paddingX =
+            parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+        const paddingY =
+            parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+        const width = Math.max(0, rect.width - paddingX);
+        const height = Math.max(0, rect.height - paddingY);
+        return { width, height };
+    }, [containerRef]);
+
+    const calculateOptimalScale = useCallback(
+        (
+            viewport: { width: number; height: number },
+            container: { width: number; height: number },
+            mode: 'fit-width' | 'fit-height' | 'fit-page' | 'cover',
+        ) => {
+            const scaleByWidth = container.width / viewport.width;
+            const scaleByHeight = container.height / viewport.height;
+
+            switch (mode) {
+                case 'fit-height':
+                    return scaleByHeight;
+                case 'fit-page':
+                    return Math.min(scaleByWidth, scaleByHeight);
+                case 'cover':
+                    return Math.max(scaleByWidth, scaleByHeight);
+                case 'fit-width':
+                default:
+                    return scaleByWidth;
+            }
+        },
+        [],
+    );
 
     // ── Load PDF document ────────────────────────────────────────────────
     useEffect(() => {
@@ -67,23 +104,27 @@ export function usePDF(
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [file]);
 
-    // ── Calculate fit-to-width base scale ────────────────────────────────
+    // ── Calculate base scale (fit/cover modes) ────────────────────────────────
     const calcBaseScale = useCallback(async () => {
-        if (!pdfDoc || !containerRef.current) return;
+        if (!pdfDoc) return;
         try {
-            const page = await pdfDoc.getPage(1);
+            const page = await pdfDoc.getPage(currentPage);
             const viewport = page.getViewport({ scale: 1 });
-            // On mobile (<768px), scale to full viewport width; on desktop use container width minus padding
+            const container = getContainerBox();
+            if (!container || container.width === 0 || container.height === 0) {
+                return;
+            }
+
             const isMobile = window.innerWidth < 768;
-            const containerWidth = isMobile
-                ? window.innerWidth
-                : containerRef.current.clientWidth - ZOOM_FIT_PADDING;
-            const scale = containerWidth / viewport.width;
-            setBaseScale(scale);
+            const mode = isMobile ? 'fit-width' : 'fit-page';
+            const scale = calculateOptimalScale(viewport, container, mode);
+            if (Number.isFinite(scale) && scale > 0) {
+                setBaseScale(scale);
+            }
         } catch {
             // Silently fail
         }
-    }, [pdfDoc, containerRef, setBaseScale]);
+    }, [pdfDoc, currentPage, getContainerBox, calculateOptimalScale, setBaseScale]);
 
     // ── Debounced resize + orientation change ────────────────────────────
     useEffect(() => {
@@ -115,6 +156,11 @@ export function usePDF(
             window.removeEventListener('resize', debouncedResize);
         };
     }, [calcBaseScale, containerRef]);
+
+    useEffect(() => {
+        if (!pdfDoc) return;
+        calcBaseScale();
+    }, [pdfDoc, currentPage, calcBaseScale]);
 
     // ── Serialized page renderer ─────────────────────────────────────────
     const executeRender = useCallback(

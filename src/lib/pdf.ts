@@ -34,10 +34,13 @@ export async function renderPageToCanvas(
     scale: number,
 ) {
     const page = await pdfDoc.getPage(pageNum);
-    const viewport = page.getViewport({ scale });
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const viewport = page.getViewport({ scale: scale * dpr });
 
     canvas.height = viewport.height;
     canvas.width = viewport.width;
+    canvas.style.width = `${viewport.width / dpr}px`;
+    canvas.style.height = `${viewport.height / dpr}px`;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D context not available');
