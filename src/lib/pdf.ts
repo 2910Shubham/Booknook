@@ -23,8 +23,17 @@ export async function loadPdfDocument(data: ArrayBuffer) {
     // which detaches the original. If React strict mode re-runs the
     // effect, the original ArrayBuffer would be unusable.
     const copy = data.slice(0);
-    const loadingTask = pdfjs.getDocument({ data: copy });
-    return loadingTask.promise;
+    try {
+        const loadingTask = pdfjs.getDocument({ data: copy });
+        return await loadingTask.promise;
+    } catch {
+        // Fallback when the worker cannot be loaded (e.g. CSP/CDN blocked).
+        const fallbackTask = pdfjs.getDocument({
+            data: copy,
+            disableWorker: true,
+        });
+        return fallbackTask.promise;
+    }
 }
 
 export async function renderPageToCanvas(

@@ -1,0 +1,788 @@
+You are building BookNook — a professional PDF book reader app.
+This is a Next.js 14 App Router project with TypeScript and Tailwind CSS.
+Execute every step in exact order. Do not skip. Do not combine steps.
+After each major step, verify it works before moving to the next.
+
+===================================================
+PHASE 1 — SUPABASE DATABASE SETUP
+===================================================
+
+STEP 1.1 — Install Supabase
+
+npm install @supabase/supabase-js @supabase/ssr
+
+---
+
+STEP 1.2 — Create environment file
+
+Create .env.local in project root with these variables
+(user will fill in values):
+
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+---
+
+STEP 1.3 — Create Supabase client files
+
+Create /lib/supabase/client.ts:
+→ Browser-side client using createBrowserClient from @supabase/ssr
+→ Export as createClient()
+
+Create /lib/supabase/server.ts:
+→ Server-side client using createServerClient from @supabase/ssr
+→ Uses Next.js cookies() for session handling
+→ Export as createServerClient()
+
+Create /lib/supabase/admin.ts:
+→ Uses SUPABASE_SERVICE_ROLE_KEY (bypasses RLS)
+→ Only used in API routes, never in client components
+→ Export as createAdminClient()
+
+---
+
+STEP 1.4 — Output this complete SQL script for user to
+run in Supabase SQL Editor (Project → SQL Editor → New query):
+
+-- =====================
+-- BookNook Database Schema
+-- =====================
+
+-- Books table
+CREATE TABLE IF NOT EXISTS books (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       TEXT NOT NULL,
+  title         TEXT NOT NULL,
+  file_name     TEXT NOT NULL,
+  file_path     TEXT,
+  file_size     INTEGER,
+  total_pages   INTEGER DEFAULT 0,
+  cover_color   TEXT DEFAULT '#c8965a',
+  uploaded_at   TIMESTAMPTZ DEFAULT NOW(),
+  last_opened   TIMESTAMPTZ
+);
+
+-- Reading Progress
+CREATE TABLE IF NOT EXISTS reading_progress (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         TEXT NOT NULL,
+  book_id         UUID REFERENCES books(id) ON DELETE CASCADE,
+  current_page    INTEGER DEFAULT 1,
+  total_pages     INTEGER DEFAULT 0,
+  last_read_at    TIMESTAMPTZ DEFAULT NOW(),
+  total_time_read INTEGER DEFAULT 0,
+  UNIQUE(user_id, book_id)
+);
+
+-- Annotations
+CREATE TABLE IF NOT EXISTS annotations (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     TEXT NOT NULL,
+  book_id     UUID REFERENCES books(id) ON DELETE CASCADE,
+  page_number INTEGER NOT NULL,
+  tool        TEXT NOT NULL CHECK (
+                tool IN ('highlight','pen','underline','note')
+              ),
+  color       TEXT,
+  data        JSONB NOT NULL DEFAULT '{}',
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Bookmarks
+CREATE TABLE IF NOT EXISTS bookmarks (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     TEXT NOT NULL,
+  book_id     UUID REFERENCES books(id) ON DELETE CASCADE,
+  page_number INTEGER NOT NULL,
+  label       TEXT DEFAULT '',
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, book_id, page_number)
+);
+
+-- Reading Sessions (daily tracking)
+CREATE TABLE IF NOT EXISTS reading_sessions (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    TEXT NOT NULL,
+  book_id    UUID REFERENCES books(id) ON DELETE CASCADE,
+  date       DATE DEFAULT CURRENT_DATE,
+  duration   INTEGER DEFAULT 0,
+  pages_read INTEGER DEFAULT 0,
+  UNIQUE(user_id, book_id, date)
+);
+
+-- Reading Goals
+CREATE TABLE IF NOT EXISTS reading_goals (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       TEXT NOT NULL,
+  book_id       UUID REFERENCES books(id) ON DELETE CASCADE,
+  daily_minutes INTEGER DEFAULT 30,
+  target_date   DATE,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, book_id)
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_books_user_id
+  ON books(user_id);
+CREATE INDEX IF NOT EXISTS idx_annotations_book_page
+  ON annotations(book_id, page_number);
+CREATE INDEX IF NOT EXISTS idx_progress_user_book
+  ON reading_progress(user_id, book_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_date
+  ON reading_sessions(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_user_book
+  ON bookmarks(user_id, book_id);
+
+-- Row Level Security
+ALTER TABLE books             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reading_progress  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE annotations       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bookmarks         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reading_sessions  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reading_goals     ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies (Clerk JWT sub = user_id)
+CREATE POLICY "users_own_books"
+  ON books FOR ALL
+  USING (user_id = current_setting('request.jwt.claims',true)::json->>'sub');
+
+CREATE POLICY "users_own_progress"
+  ON reading_progress FOR ALL
+  USING (user_id = current_setting('request.jwt.claims',true)::json->>'sub');
+
+CREATE POLICY "users_own_annotations"
+  ON annotations FOR ALL
+  USING (user_id = current_setting('request.jwt.claims',true)::json->>'sub');
+
+CREATE POLICY "users_own_bookmarks"
+  ON bookmarks FOR ALL
+  USING (user_id = current_setting('request.jwt.claims',true)::json->>'sub');
+
+CREATE POLICY "users_own_sessions"
+  ON reading_sessions FOR ALL
+  USING (user_id = current_setting('request.jwt.claims',true)::json->>'sub');
+
+CREATE POLICY "users_own_goals"
+  ON reading_goals FOR ALL
+  USING (user_id = current_setting('request.jwt.claims',true)::json->>'sub');
+
+-- Storage bucket for PDF files
+INSERT INTO storage.buckets (id, name, public, file_size_limit)
+VALUES ('books', 'books', false, 52428800)
+ON CONFLICT DO NOTHING;
+
+-- Storage RLS
+CREATE POLICY "users_own_files"
+  ON storage.objects FOR ALL
+  USING (
+    bucket_id = 'books'
+    AND (storage.foldername(name))[1] =
+      current_setting('request.jwt.claims',true)::json->>'sub'
+  );
+
+---
+
+STEP 1.5 — Create /types/database.ts with full TypeScript
+types for every table:
+
+export type Book = {
+  id: string
+  user_id: string
+  title: string
+  file_name: string
+  file_path: string | null
+  file_size: number | null
+  total_pages: number
+  cover_color: string
+  uploaded_at: string
+  last_opened: string | null
+}
+
+export type BookInsert = Omit<Book, 'id' | 'uploaded_at'>
+
+export type ReadingProgress = {
+  id: string
+  user_id: string
+  book_id: string
+  current_page: number
+  total_pages: number
+  last_read_at: string
+  total_time_read: number
+}
+
+export type Annotation = {
+  id: string
+  user_id: string
+  book_id: string
+  page_number: number
+  tool: 'highlight' | 'pen' | 'underline' | 'note'
+  color: string | null
+  data: HighlightData | PenData | UnderlineData | NoteData
+  created_at: string
+  updated_at: string
+}
+
+export type HighlightData = {
+  x: number; y: number; width: number; height: number
+}
+export type PenData = {
+  points: { x: number; y: number }[]
+  strokeWidth: number
+}
+export type UnderlineData = {
+  x: number; y: number; width: number
+}
+export type NoteData = {
+  x: number; y: number; text: string
+}
+
+export type Bookmark = {
+  id: string
+  user_id: string
+  book_id: string
+  page_number: number
+  label: string
+  created_at: string
+}
+
+export type ReadingSession = {
+  id: string
+  user_id: string
+  book_id: string
+  date: string
+  duration: number
+  pages_read: number
+}
+
+export type ReadingGoal = {
+  id: string
+  user_id: string
+  book_id: string
+  daily_minutes: number
+  target_date: string | null
+  created_at: string
+}
+
+---
+
+STEP 1.6 — Create /lib/supabase/queries/ files:
+
+books.ts — functions:
+  getUserBooks(userId: string): Promise<Book[]>
+  createBook(data: BookInsert): Promise<Book>
+  updateBookPages(bookId: string, totalPages: number): Promise<void>
+  updateLastOpened(bookId: string): Promise<void>
+  deleteBook(userId: string, bookId: string): Promise<void>
+
+annotations.ts — functions:
+  getPageAnnotations(bookId: string, page: number): Promise<Annotation[]>
+  createAnnotation(data: Omit<Annotation,'id'|'created_at'|'updated_at'>): Promise<Annotation>
+  deleteAnnotation(annotationId: string): Promise<void>
+
+progress.ts — functions:
+  getProgress(userId: string, bookId: string): Promise<ReadingProgress | null>
+  upsertProgress(userId: string, bookId: string, page: number, totalTime: number): Promise<void>
+
+sessions.ts — functions:
+  logSession(userId: string, bookId: string, duration: number, pagesRead: number): Promise<void>
+
+bookmarks.ts — functions:
+  getBookmarks(userId: string, bookId: string): Promise<Bookmark[]>
+  addBookmark(userId: string, bookId: string, page: number, label?: string): Promise<Bookmark>
+  removeBookmark(userId: string, bookId: string, page: number): Promise<void>
+
+---
+
+STEP 1.7 — Create /lib/supabase/storage.ts:
+
+uploadBookFile(userId, bookId, file: File):
+  → path: {userId}/{bookId}/{sanitized-filename}
+  → upload to 'books' bucket
+  → return storage path string
+
+getSignedUrl(filePath: string):
+  → generate signed URL valid 7200 seconds (2 hours)
+  → return URL string
+
+deleteBookFile(filePath: string):
+  → delete from 'books' bucket
+
+---
+
+PHASE 1 COMPLETE CHECKPOINT:
+✅ @supabase/supabase-js and @supabase/ssr installed
+✅ .env.local created with placeholder values
+✅ /lib/supabase/client.ts exists
+✅ /lib/supabase/server.ts exists
+✅ /lib/supabase/admin.ts exists
+✅ /types/database.ts exists with all types
+✅ All query files exist with correct function signatures
+✅ /lib/supabase/storage.ts exists
+✅ SQL script output ready for user to run
+
+===================================================
+PHASE 2 — CLERK AUTHENTICATION SETUP
+===================================================
+
+STEP 2.1 — Install Clerk
+
+npm install @clerk/nextjs
+
+---
+
+STEP 2.2 — Add Clerk env vars to .env.local:
+
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/library
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/library
+
+---
+
+STEP 2.3 — Create middleware.ts in project root:
+
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/api/webhook(.*)'
+])
+
+export default clerkMiddleware(async (auth, request) => {
+  if (!isPublicRoute(request)) {
+    await auth.protect()
+  }
+})
+
+export const config = {
+  matcher: [
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/(api|trpc)(.*)',
+  ],
+}
+
+---
+
+STEP 2.4 — Update app/layout.tsx:
+
+Wrap entire app in ClerkProvider inside body.
+ClerkProvider appearance config:
+  variables: {
+    colorPrimary: '#c8965a',
+    colorBackground: '#1a1410',
+    colorInputBackground: '#2e2720',
+    colorText: '#e8ddd0',
+    colorTextSecondary: '#a09080',
+    borderRadius: '6px',
+    fontFamily: 'Lora, serif'
+  }
+
+Use <Show> NOT <SignedIn>/<SignedOut> (those are deprecated).
+
+---
+
+STEP 2.5 — Create auth pages:
+
+app/(auth)/layout.tsx:
+→ Full screen dark background #1a1410
+→ Centered column layout
+→ BookNook logo text (Playfair Display font) above card
+→ Tagline "Your reading sanctuary" below logo
+→ Clerk component card centered in viewport
+
+app/(auth)/sign-in/[[...sign-in]]/page.tsx:
+→ Import and render <SignIn /> from @clerk/nextjs
+→ Pass routing="path" path="/sign-in"
+
+app/(auth)/sign-up/[[...sign-up]]/page.tsx:
+→ Import and render <SignUp /> from @clerk/nextjs
+→ Pass routing="path" path="/sign-up"
+
+app/page.tsx:
+→ Server component
+→ Import auth() from @clerk/nextjs/server
+→ If userId exists → redirect('/library')
+→ If not → redirect('/sign-in')
+
+---
+
+STEP 2.6 — Create /features/auth/hooks/useCurrentUser.ts:
+
+import { useUser } from '@clerk/nextjs'
+
+export function useCurrentUser() {
+  const { user, isLoaded, isSignedIn } = useUser()
+  return {
+    userId: user?.id ?? null,
+    user,
+    isLoaded,
+    isSignedIn
+  }
+}
+
+---
+
+PHASE 2 COMPLETE CHECKPOINT:
+✅ middleware.ts uses clerkMiddleware() not authMiddleware()
+✅ ClerkProvider wraps app in layout.tsx inside <body>
+✅ <Show> used — NOT <SignedIn>/<SignedOut>
+✅ /sign-in and /sign-up pages render with dark BookNook theme
+✅ app/page.tsx redirects correctly based on auth state
+✅ Accessing /library without auth → redirects to /sign-in
+✅ After sign up → redirects to /library
+✅ useCurrentUser hook returns userId correctly
+
+===================================================
+PHASE 3 — LIBRARY PAGE + PDF UPLOAD TO SUPABASE
+===================================================
+
+STEP 3.1 — Create API routes:
+
+app/api/books/route.ts:
+
+GET handler:
+  1. Get userId from Clerk auth()
+  2. Return 401 if not authenticated
+  3. Query books table for this userId
+  4. For each book, join reading_progress
+  5. Return books array with progress
+
+POST handler:
+  1. Get userId from Clerk auth()
+  2. Parse body: { title, fileName, fileSize, totalPages }
+  3. Insert into books table using admin client
+  4. Return created book with id
+
+app/api/books/[id]/route.ts:
+
+DELETE handler:
+  1. Get userId from Clerk auth()
+  2. Verify book.user_id === userId (security check)
+  3. Delete file from Supabase Storage
+  4. Delete book record (cascades to all related data)
+  5. Return 200
+
+app/api/books/[id]/signed-url/route.ts:
+
+GET handler:
+  1. Get userId from Clerk auth()
+  2. Verify book belongs to user
+  3. Generate signed URL for book file_path
+  4. Return { url, expiresAt }
+
+---
+
+STEP 3.2 — Create /store/libraryStore.ts (Zustand):
+
+State:
+  books: BookWithProgress[]
+  isLoading: boolean
+  error: string | null
+
+Actions:
+  fetchBooks(): fetch from /api/books, set books
+  addBook(book): optimistic add to books array
+  removeBook(bookId): optimistic remove from books array
+  updateBookProgress(bookId, page): update progress in store
+
+Type BookWithProgress = Book & {
+  progress: ReadingProgress | null
+}
+
+---
+
+STEP 3.3 — Create library UI:
+
+app/(app)/layout.tsx:
+→ Server component
+→ auth() from Clerk — redirects to /sign-in if no session
+→ Renders children only if authenticated
+
+app/(app)/library/page.tsx:
+→ Client component
+→ On mount: call libraryStore.fetchBooks()
+→ Renders LibraryHeader + BookGrid + UploadFAB
+
+/features/library/components/LibraryHeader.tsx:
+→ Left: BookNook logo (Playfair Display)
+→ Right: UserButton from @clerk/nextjs
+→ Subtitle: "X books in your library"
+→ Dark theme, border bottom
+
+/features/library/components/BookGrid.tsx:
+→ Responsive CSS grid: 2 col mobile, 3 tablet, 4 desktop
+→ Maps books to BookCard
+→ Shows EmptyState if no books
+
+/features/library/components/BookCard.tsx:
+→ Book cover area: solid color (cover_color) with title initials
+→ Book title (2 line clamp)
+→ Progress bar: filled % based on current_page / total_pages
+→ "Page X of Y" text
+→ "Last read: X days ago" or "Never opened"
+→ On click → router.push('/reader?bookId=' + book.id)
+→ Long press or 3-dot menu → delete option with confirmation
+
+/features/library/components/EmptyState.tsx:
+→ Large open book SVG illustration (draw in SVG, no images)
+→ "Your library is empty"
+→ "Upload your first book to get started"
+→ Upload button
+
+/features/library/components/UploadFAB.tsx:
+→ Fixed bottom-right button
+→ + icon (Lucide Plus)
+→ Amber background #c8965a
+→ Opens UploadModal on click
+
+/features/library/components/UploadModal.tsx:
+→ Full upload flow in one modal:
+
+  STAGE 1 — File Select:
+  - Drag and drop zone with dashed border
+  - "Drop your PDF here" text
+  - Click to browse fallback
+  - Validates: PDF only, max 50MB
+  - Shows error inline if invalid
+
+  STAGE 2 — Uploading:
+  - File name + size shown
+  - Real upload progress bar (0-100%)
+  - Progress comes from Supabase upload onUploadProgress
+  - "Uploading... X%" text
+  - Cannot cancel (keep simple)
+
+  STAGE 3 — Complete:
+  - Checkmark animation
+  - "Ready to read!" message
+  - Auto-close after 1.5 seconds
+  - Book appears in library grid
+
+  Upload logic sequence:
+  1. Read file as ArrayBuffer to get total pages via PDF.js
+  2. POST /api/books → get book.id back
+  3. Upload file to Supabase Storage:
+     path: {userId}/{bookId}/{sanitizedFileName}
+  4. PATCH /api/books/{id} with filePath + totalPages
+  5. libraryStore.addBook(newBook) → appears in grid
+  6. Show stage 3 complete screen
+
+---
+
+PHASE 3 COMPLETE CHECKPOINT:
+✅ Library page shows user's books
+✅ Upload modal completes full flow
+✅ PDF stored in Supabase Storage at correct path
+✅ Book appears in library after upload
+✅ Delete removes book from storage + DB
+✅ Clicking book navigates to /reader?bookId=X
+✅ Progress shown on book cards
+
+===================================================
+PHASE 4 — READER INTEGRATION WITH DATABASE
+===================================================
+
+STEP 4.1 — Update reader to load from Supabase:
+
+In app/(app)/reader/page.tsx:
+→ Read bookId from searchParams
+→ If no bookId → redirect to /library
+→ Fetch signed URL from /api/books/{bookId}/signed-url
+→ Pass URL to PDF renderer (replaces local file)
+→ On mount: fetch reading_progress for this book
+→ Restore to saved page, show toast "Resumed from page X"
+→ On unmount: save final session data
+
+---
+
+STEP 4.2 — Reading Progress Sync:
+
+In usePDF.ts (or wherever page changes are handled):
+→ On every page change:
+   - Update local state immediately
+   - Debounced 800ms → PUT /api/progress
+   - Also update localStorage as cache
+
+Create app/api/progress/route.ts:
+  GET ?bookId=  → returns reading_progress row for auth user
+  PUT           → body: { bookId, currentPage, totalPages }
+                → upserts progress row
+                → updates last_read_at to NOW()
+
+---
+
+STEP 4.3 — Annotation Sync:
+
+Replace localStorage-only annotation saves with DB sync.
+
+In useAnnotationPersistence.ts:
+
+ON PAGE LOAD:
+  1. Check localStorage cache first (instant render)
+  2. Fetch GET /api/annotations?bookId=X&page=Y from DB
+  3. Merge DB annotations into store (DB is source of truth)
+  4. Update localStorage cache
+
+ON ANNOTATION CREATE:
+  1. Add to local store immediately (optimistic)
+  2. POST /api/annotations
+  3. On success: update annotation id in store with DB id
+  4. On failure: add to offline queue, keep local copy
+
+ON ANNOTATION DELETE:
+  1. Remove from local store immediately (optimistic)
+  2. DELETE /api/annotations/{id}
+  3. On failure: restore annotation, add delete to offline queue
+
+Create app/api/annotations/route.ts:
+  GET ?bookId=&page=  → returns annotations array
+  POST               → body: full annotation object
+                     → INSERT, return with id
+
+app/api/annotations/[id]/route.ts:
+  DELETE → removes annotation (verify ownership first)
+
+---
+
+STEP 4.4 — Session Tracking:
+
+In reader layout or page component:
+
+On mount:
+  sessionStartTime = Date.now()
+  sessionStartPage = currentPage
+
+On unmount + on document visibility hidden:
+  duration = Math.floor((Date.now() - sessionStartTime) / 1000)
+  pagesRead = Math.abs(currentPage - sessionStartPage)
+  if (duration > 10) {  // Only log if read for > 10 seconds
+    POST /api/sessions with { bookId, duration, pagesRead }
+  }
+
+Create app/api/sessions/route.ts:
+  POST → body: { bookId, duration, pagesRead }
+       → UPSERT to reading_sessions
+       → If row for today exists: duration += new duration
+       → If not: INSERT new row
+
+---
+
+STEP 4.5 — Offline Queue:
+
+Create /lib/offlineQueue.ts:
+
+QUEUE_KEY = 'booknook_offline_queue'
+
+type QueuedOperation = {
+  id: string
+  type: 'create_annotation' | 'delete_annotation' | 'update_progress' | 'log_session'
+  payload: object
+  createdAt: number
+  attempts: number
+}
+
+Functions:
+  enqueue(operation): push to localStorage queue array
+  processQueue(): 
+    - Read all queued operations
+    - For each: attempt the API call
+    - On success: remove from queue
+    - On failure: increment attempts, keep in queue (max 5 attempts)
+    - Log results
+
+Auto-trigger processQueue():
+  - On app load (in root layout useEffect)
+  - On window 'online' event
+
+Show sync banner in reader:
+  - Green dot + "Saved" when queue is empty
+  - Amber spinning dot + "Saving..." when request in flight
+  - Red dot + "Offline" when navigator.onLine is false
+  - Tap red dot shows count of pending operations
+
+---
+
+STEP 4.6 — Reader Toolbar Updates:
+
+Add to existing reader toolbar:
+  Left side: ← Back to Library (navigates to /library)
+  Right side: <UserButton /> from Clerk (small, 28px)
+  Right side: Sync status dot indicator
+
+Do NOT change any existing toolbar layout.
+Only add these elements at the edges.
+
+---
+
+PHASE 4 COMPLETE CHECKPOINT:
+✅ Reader loads PDF from Supabase signed URL
+✅ Page progress restores from DB on open
+✅ Toast shows "Resumed from page X"
+✅ Page saves to DB on every turn (debounced)
+✅ Annotations load from DB on page change
+✅ New annotations save to DB immediately
+✅ Reading sessions logged on reader close
+✅ Offline queue works — no data loss
+✅ Sync indicator visible in reader toolbar
+✅ Back to Library button works
+✅ All Phase 1, 2, 3 visual features still intact
+
+===================================================
+FINAL VERIFICATION — RUN ALL CHECKS
+===================================================
+
+AUTH:
+✅ Sign up creates new user in Clerk dashboard
+✅ Sign in restores existing user's library
+✅ Sign out clears session, redirects to /sign-in
+✅ Protected routes redirect to /sign-in when logged out
+
+LIBRARY:
+✅ Upload PDF → appears in library grid
+✅ Book card shows correct progress percentage
+✅ Clicking book opens reader at last saved page
+✅ Delete book removes from grid and Supabase
+
+READER:
+✅ PDF loads and renders correctly
+✅ All annotation tools work and save to DB
+✅ Open same book on different device → same page restored
+✅ Create highlight on phone → visible on desktop
+✅ Reading time accumulates in reading_sessions table
+
+SECURITY:
+✅ User A cannot access User B's books (test with two accounts)
+✅ All API routes return 401 without valid Clerk session
+✅ Supabase RLS blocks direct DB access without correct user_id
+
+OFFLINE:
+✅ Disconnect internet → annotations save to queue
+✅ Reconnect internet → queue processes, data appears in DB
+✅ No data loss under any network condition
+
+===================================================
+CREDENTIALS NEEDED FROM USER
+===================================================
+
+Tell user to provide these before starting:
+
+FROM SUPABASE (supabase.com → project → Settings → API):
+  NEXT_PUBLIC_SUPABASE_URL
+  NEXT_PUBLIC_SUPABASE_ANON_KEY  
+  SUPABASE_SERVICE_ROLE_KEY
+
+FROM CLERK (clerk.com → application → API Keys):
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY  (starts with pk_)
+  CLERK_SECRET_KEY                   (starts with sk_)
+
+IMPORTANT RULES:
+- Never commit .env.local to git
+- Never use SUPABASE_SERVICE_ROLE_KEY in client components
+- Never use CLERK_SECRET_KEY in client components
+- Service role key only in /api/ server routes

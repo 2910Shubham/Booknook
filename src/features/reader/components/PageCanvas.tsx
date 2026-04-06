@@ -14,6 +14,7 @@ const CANVAS_FILTERS: Record<ThemeMode, string> = {
     dark: 'invert(0.88) hue-rotate(180deg)',
     sepia: 'sepia(0.35) brightness(0.95)',
     night: 'invert(0.88) hue-rotate(180deg) brightness(0.5) sepia(0.5) saturate(2)',
+    'eye-protection': 'sepia(0.7) brightness(0.9) contrast(0.9)',
 };
 
 interface PageCanvasProps {

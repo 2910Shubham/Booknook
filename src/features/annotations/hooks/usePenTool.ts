@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Annotation, PenAnnotation } from '../types';
 import { drawAnnotations, drawPenPreview } from '../utils/canvasHelpers';
+import { createAnnotationId } from '../utils/createId';
 
 interface UsePenToolProps {
     active: boolean;
@@ -77,7 +78,7 @@ export function usePenTool({
 
             if (normalizedRef.current.length > 1) {
                 addAnnotation({
-                    id: crypto.randomUUID?.() || `${Date.now()}`,
+                    id: createAnnotationId(),
                     tool: 'pen',
                     page,
                     color,

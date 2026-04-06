@@ -7,6 +7,7 @@ interface PdfState {
     file: ArrayBuffer | null;
     fileName: string;
     fileSize: number;
+    bookId: string | null;
 
     // PDF Document
     pdfDoc: PDFDocumentProxy | null;
@@ -22,6 +23,7 @@ interface PdfState {
 
     // Actions — File
     setFile: (file: ArrayBuffer, name: string, size: number) => void;
+    setBookId: (bookId: string | null) => void;
     clearFile: () => void;
 
     // Actions — PDF
@@ -46,6 +48,7 @@ export const usePdfStore = create<PdfState>((set, get) => ({
     file: null,
     fileName: '',
     fileSize: 0,
+    bookId: null,
     pdfDoc: null,
     totalPages: 0,
     currentPage: 1,
@@ -58,11 +61,14 @@ export const usePdfStore = create<PdfState>((set, get) => ({
     setFile: (file, fileName, fileSize) =>
         set({ file, fileName, fileSize, error: null }),
 
+    setBookId: (bookId) => set({ bookId }),
+
     clearFile: () =>
         set({
             file: null,
             fileName: '',
             fileSize: 0,
+            bookId: null,
             pdfDoc: null,
             totalPages: 0,
             currentPage: 1,

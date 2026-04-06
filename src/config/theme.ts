@@ -136,6 +136,32 @@ export const THEME_MAP: Record<ThemeMode, ThemeColors> = {
         '--scrollbar-thumb': '#3a2828',
         '--shadow-color': 'rgba(0, 0, 0, 0.5)',
     },
+    'eye-protection': {
+        '--bg-primary': '#fff9e6',
+        '--bg-secondary': '#fdf2c5',
+        '--bg-surface': '#fffdf5',
+        '--bg-overlay': 'rgba(255, 249, 230, 0.92)',
+        '--text-primary': '#4a3f25',
+        '--text-secondary': '#7a6c4a',
+        '--text-muted': '#a0927a',
+        '--text-accent': '#a37b1e',
+        '--border-primary': '#e8dfbc',
+        '--border-subtle': '#f2ebcf',
+        '--accent': '#c8965a',
+        '--accent-hover': '#b68549',
+        '--accent-muted': 'rgba(200, 150, 90, 0.15)',
+        '--canvas-bg': '#fff5d1',
+        '--toolbar-bg': 'rgba(253, 242, 197, 0.92)',
+        '--toolbar-border': '#e8dfbc',
+        '--button-bg': 'transparent',
+        '--button-hover': 'rgba(74, 63, 37, 0.06)',
+        '--button-text': '#7a6c4a',
+        '--toast-bg': '#4a3f25',
+        '--toast-text': '#fff9e6',
+        '--scrollbar-track': '#fdf2c5',
+        '--scrollbar-thumb': '#d8cc9d',
+        '--shadow-color': 'rgba(74, 63, 37, 0.08)',
+    },
 };
 
 export const THEME_LABELS: Record<ThemeMode, string> = {
@@ -143,6 +169,7 @@ export const THEME_LABELS: Record<ThemeMode, string> = {
     dark: 'Dark',
     sepia: 'Sepia',
     night: 'Night',
+    'eye-protection': 'Eye Care',
 };
 
 export const THEME_PREVIEW_COLORS: Record<ThemeMode, { bg: string; fg: string }> = {
@@ -150,4 +177,5 @@ export const THEME_PREVIEW_COLORS: Record<ThemeMode, { bg: string; fg: string }>
     dark: { bg: '#1a1410', fg: '#e8dfd4' },
     sepia: { bg: '#f4ede4', fg: '#3e3229' },
     night: { bg: '#0a0808', fg: '#8a6060' },
+    'eye-protection': { bg: '#fff9e6', fg: '#4a3f25' },
 };

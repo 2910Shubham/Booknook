@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Annotation, NoteAnnotation } from '../types';
+import { createAnnotationId } from '../utils/createId';
 
 interface UseStickyNoteProps {
     active: boolean;
@@ -77,7 +78,7 @@ export function useStickyNote({
             const point = getCanvasPoint(clientX, clientY);
             if (!point) return;
             const note: NoteAnnotation = {
-                id: crypto.randomUUID?.() || `${Date.now()}`,
+                id: createAnnotationId(),
                 tool: 'note',
                 page,
                 color,

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Annotation, HighlightAnnotation } from '../types';
 import { drawHighlightPreview, drawAnnotations } from '../utils/canvasHelpers';
+import { createAnnotationId } from '../utils/createId';
 
 interface UseHighlighterProps {
     active: boolean;
@@ -72,7 +73,7 @@ export function useHighlighter({
 
             if (width > 0.002 && height > 0.002) {
                 addAnnotation({
-                    id: crypto.randomUUID?.() || `${Date.now()}`,
+                    id: createAnnotationId(),
                     tool: 'highlight',
                     page,
                     color,

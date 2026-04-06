@@ -3,11 +3,23 @@
 export const APP_NAME = 'BookNook';
 export const APP_DESCRIPTION = 'A refined PDF reading experience';
 
-// PDF Constants
-export const ACCEPTED_FILE_TYPES = '.pdf';
-export const ACCEPTED_MIME_TYPES = ['application/pdf'];
+// PDF and Document Constants
+export const ACCEPTED_FILE_TYPES = '.pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp';
+export const ACCEPTED_MIME_TYPES = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+];
 export const MAX_FILE_SIZE_MB = 200;
 export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+export const COMPRESSION_THRESHOLD_MB = 10;
+export const COMPRESSION_THRESHOLD_BYTES =
+    COMPRESSION_THRESHOLD_MB * 1024 * 1024;
 
 // Zoom Constants
 export const ZOOM_MIN = 0.25;
@@ -26,6 +38,7 @@ export const STORAGE_KEYS = {
     THEME: 'booknook-theme',
     FONT_SIZE: 'booknook-font-size',
     READING_PROGRESS: 'booknook-reading-progress',
+    LOCAL_LIBRARY: 'booknook-local-library',
 } as const;
 
 // PDF.js Worker — matching installed pdfjs-dist@5.5.207

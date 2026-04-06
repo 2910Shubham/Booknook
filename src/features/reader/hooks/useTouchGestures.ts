@@ -5,7 +5,7 @@ import { usePdfStore } from '@/store/pdfStore';
 import { ZOOM_MIN, ZOOM_MAX } from '@/lib/constants';
 
 const SWIPE_THRESHOLD = 50; // px minimum to count as swipe
-const TAP_ZONE_RATIO = 0.20; // 20% of screen width
+const TAP_ZONE_RATIO = 0.15; // 15% of screen width
 
 export function useTouchGestures(containerRef: React.RefObject<HTMLElement | null>) {
     const setZoom = usePdfStore((s) => s.setZoom);

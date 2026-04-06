@@ -24,6 +24,7 @@ interface AnnotationCanvasProps {
 
 export default function AnnotationCanvas({ pdfCanvasRef }: AnnotationCanvasProps) {
     const fileName = usePdfStore((s) => s.fileName);
+    const bookId = usePdfStore((s) => s.bookId);
     const currentPage = usePdfStore((s) => s.currentPage);
     const zoom = usePdfStore((s) => s.zoom);
     const baseScale = usePdfStore((s) => s.baseScale);
@@ -48,7 +49,7 @@ export default function AnnotationCanvas({ pdfCanvasRef }: AnnotationCanvasProps
         annotationsRef.current = annotations;
     }, [annotations]);
 
-    useAnnotationPersistence(fileName, currentPage);
+    useAnnotationPersistence(fileName, currentPage, bookId);
 
     useEffect(() => {
         syncSize();
@@ -187,3 +188,4 @@ export default function AnnotationCanvas({ pdfCanvasRef }: AnnotationCanvasProps
         </div>
     );
 }
+

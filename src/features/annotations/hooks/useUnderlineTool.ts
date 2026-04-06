@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Annotation, UnderlineAnnotation } from '../types';
 import { drawAnnotations, drawUnderlinePreview } from '../utils/canvasHelpers';
+import { createAnnotationId } from '../utils/createId';
 
 interface UseUnderlineProps {
     active: boolean;
@@ -70,7 +71,7 @@ export function useUnderlineTool({
 
             if (width > 0.002) {
                 addAnnotation({
-                    id: crypto.randomUUID?.() || `${Date.now()}`,
+                    id: createAnnotationId(),
                     tool: 'underline',
                     page,
                     color,

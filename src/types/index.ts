@@ -1,6 +1,8 @@
 // ─── Global Shared Types ─────────────────────────────────────────────────────
 
-export type ThemeMode = 'light' | 'dark' | 'sepia' | 'night';
+export type ThemeMode = 'light' | 'dark' | 'sepia' | 'night' | 'eye-protection';
+
+export type FileType = 'pdf' | 'word' | 'ppt' | 'image' | 'unknown';
 
 export type FontSize = 'small' | 'medium' | 'large';
 
@@ -8,6 +10,7 @@ export interface BookMeta {
   fileName: string;
   fileSize: number;
   totalPages: number;
+  fileType: FileType;
 }
 
 export interface ReadingProgress {
